@@ -11,7 +11,7 @@ from abc import ABC, abstractmethod
 from collections.abc import MutableSequence, Sequence
 from functools import lru_cache
 from pathlib import Path
-from subprocess import run
+from subprocess import run, Popen
 from tempfile import mkdtemp, mkstemp
 from typing import Any, Mapping
 from unittest import SkipTest, TestCase
@@ -158,6 +158,86 @@ class TestPostgres(TestDatabaseBase):
         )
         # psql doesn't always return != 0 if it fails
         assert completed_process.stderr == b"", completed_process.stderr
+
+
+class TestMariaDb(TestDatabaseBase):
+    """Test MariaDb database."""
+
+    basedir: Path | None = None
+    datadir: Path | None = None
+
+    @classmethod
+    def skip(cls) -> str | None:
+        if shutil.which("mariadbd"):
+            return None
+        return "MariaDB server is not installed"
+
+    @classmethod
+    def setup(cls) -> None:
+        """Set up the test database."""
+        cls.basedir = Path(mkdtemp("db"))
+        cls.datadir = cls.basedir / "data"
+        os.mkdir(cls.datadir)
+        install_process = run([
+            "mariadb-install-db",
+            "--basedir",
+            cls.basedir,
+            "--datadir",
+            cls.datadir,
+        ])
+
+    def __init__(self) -> None:
+        """Initialize the test database."""
+        self.port = 0
+        self.process = Popen | None
+        self.open()
+
+    def open(self) -> None:
+        """Start the test database"""
+        self.port = random.randint(16500,65500)
+        self.process = Popen([
+            "mariadbd",
+            "--datadir",
+            self.datadir,
+            "--pid-file",
+            self.basedir / "mysqld.pid",
+            "--socket",
+            self.basedir / "mysqld.sock",
+            "--port",
+            str(self.port),
+            "--skip-grant-tables",
+        ])
+
+    def close(self) -> None:
+        """Tear down the test database."""
+        self.process.kill()
+        self.process = None
+        self.port = 0
+
+    @classmethod
+    def final(cls) -> None:
+        """Clean up after all testing"""
+
+    def get_dsn(self, database_name: str | None) -> str:
+        """Get the DSN for the test database."""
+        return "mariadb+pymysql://127.0.0.1/" + database_name
+
+    def run_sql(self, sql_file: Path) -> None:
+        """Run mariadb and pass a sql file as the --file option."""
+        # Need to truncate CREATE DATABASE name ... ;
+        # because MySQL doesn't like WITH TEMPLATE, ENCODING and LOCALE.
+        #...
+        process = Popen([
+            "mariadb",
+            "--host",
+            "127.0.0.1",
+            "--port",
+            str(self.port),
+        ], stdin=sql_file.open(encoding="utf-8"))
+        return_code = process.wait()
+        breakpoint()
+        assert return_code == 0
+        return
 
 
 class TestDuckDb(TestDatabaseBase):

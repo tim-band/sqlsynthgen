@@ -13,6 +13,7 @@ from tests.utils import (
     RequiresDBTestCase,
     TestDbCmdMixin,
     TestDuckDb,
+    TestMariaDb,
 )
 
 
@@ -746,6 +747,12 @@ class GeneratorsOutputTestsDuckDb(GeneratorsOutputTests):
     """As ``GeneratorsOutputTests`` but with DuckDB."""
 
     database_type = TestDuckDb
+
+
+class GeneratorsOutputTestsMariaDb(GeneratorsOutputTests):
+    """As ``GeneratorsOutputTests`` but with DuckDB."""
+
+    database_type = TestMariaDb
 
 
 class GeneratorTests(GeneratesDBTestCase):
